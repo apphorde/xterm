@@ -18,9 +18,7 @@
         }
       }
     </script>
-    <script type="module">
-      import "@li3/web";
-    </script>
+    <script type="module" src="@li3/web"></script>
   </head>
   <body>
     <template app>
@@ -60,7 +58,7 @@
 
           watch(
             sessions,
-            localStorage.setItem("sessions", JSON.stringify(sessions.value)),
+            () => localStorage.setItem("sessions", JSON.stringify(sessions.value)),
           );
 
           return { onAdd, onClose, sessions };
