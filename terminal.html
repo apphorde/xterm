@@ -101,6 +101,9 @@
         terminal.onResize(({ cols, rows }) =>
           onSend({ type: "resize", data: { cols, rows } }),
         );
+
+        const addOn = new WeakRef(fitAddon);
+        autofit.add(addOn);
       }
 
       function onClientWrite(c) {
@@ -185,16 +188,9 @@
         setTimeout(() => fitAddon.fit(), 1000);
       }
 
-      const addOn = new WeakRef(fitAddon);
-
       onInit(() => {
         createTerminal();
         connect();
-        autofit.add(addOn);
-      });
-
-      onDestroy(() => {
-        autofit.delete(addOn);
       });
 
       function onReconnect() {
