@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SSH over WebSocket</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.16/dist/tailwind.min.css"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.5.0/xterm.min.css"
+      integrity="sha512-XpXUuzg5afNt1bsgnrOesXP70TLH8tXYYK5sK+Y0UV+YBvJn9EfRFYWy4HT3TVDfH0nl1CO0lwOxIrt2gk9qjg=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
+    <script type="importmap">
+      {
+        "imports": {
+          "@li3/": "https://at-li3.static.apphor.de/",
+          "@sodium/": "https://at-sodium.static.apphor.de/",
+          "@lucide/": "https://at-lucide.static.apphor.de/"
+        }
+      }
+    </script>
+    <script src="https://unpkg.com/@xterm/xterm@5.5.0/lib/xterm.js"></script>
+    <script src="https://unpkg.com/@xterm/addon-fit@0.10.0/lib/addon-fit.js"></script>
+    <script type="module">
+      import "@li3/web";
+    </script>
+  </head>
+  <body>
+    <template app>
+    </template>
+    <template component="x-terminal">
+      <script setup>
+        import { loadCss, templateRef } from '@li3/web';
+        import terminal from './terminal.mjs';
+
+        export default function () {
+          const el = templateRef('terminal')
+          loadCss('https://cdnjs.cloudflare.com/ajax/libs/xterm/5.5.0/xterm.min.css');
+          
+        }
+      </script>
+      <div ref="terminal"></div>
+    </template>
+  </body>
+</html>
