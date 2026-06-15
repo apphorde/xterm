@@ -1,0 +1,212 @@
+<template component="x-terminal">
+  <style>
+    app-terminal {
+      display: contents;
+    }
+  </style>
+
+  <div class="flex flex-col w-full min-h-full">
+    <div class="flex w-full h-8 items-center">
+      <div class="w-full text-sm">{{ name }}</div>
+      <button
+        ref="status"
+        class="rounded-full w-3 h-3 top-0 right-0 mr-2"
+        class-bg-green-400="online"
+        class-bg-yellow-400="!online"
+        on-click="onReconnect()"
+      ></button>
+
+      <button
+        ref="close"
+        class="rounded-full w-3 h-3 top-0 right-0 bg-red-400"
+        on-click="onClose()"
+      ></button>
+    </div>
+    <div class="flex flex-col items-center justify-center h-full">
+      <div
+        ref="terminal"
+        class="w-full h-full overflow-hidden rounded-lg p-2 bg-black"
+      ></div>
+    </div>
+  </div>
+
+  <script setup>
+    import {
+      ref,
+      templateRef,
+      defineProp,
+      onInit,
+      onDestroy,
+      loadCss,
+    } from "@li3/web";
+    import { Terminal } from "https://unpkg.com/@xterm/xterm@6/lib/xterm.mjs";
+    import { FitAddon } from "https://unpkg.com/@xterm/addon-fit@0.11.0/lib/addon-fit.mjs";
+
+    const config = {
+      maxBuffer: 5,
+      debounceTime: 50,
+    };
+
+    function debounce(fn, time = config.debouceTime) {
+      let timer;
+
+      return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), time);
+      };
+    }
+
+    const autofit = new Set();
+    window.addEventListener("resize", () => {
+      for (const next of autofit) {
+        const ref = next.deref();
+        if (ref) {
+          ref.fit();
+        } else {
+          autofit.delete(next);
+        }
+      }
+    });
+
+    export default function () {
+      const terminalRef = templateRef("terminal");
+      const reconnect = ref(true);
+      const online = ref(false);
+      const remote = defineProp("remote", { default: "" });
+      const name = defineProp("name", {
+        default() {
+          return "term-" + ~~(Math.random() * 100);
+        },
+      });
+
+      function sendInput() {
+        const data = clientBuffer.join("");
+        onSend({ type: "input", data });
+        clientBuffer.length = 0;
+      }
+
+      let currentSocket;
+      let terminal;
+      let fitAddon;
+      const sendDelayed = debounce(sendInput);
+      const clientBuffer = [];
+
+      function createTerminal() {
+        terminal = new Terminal({ convertEol: true });
+        terminal.open(terminalRef.value);
+
+        fitAddon = new FitAddon();
+        terminal.loadAddon(fitAddon);
+        terminal.onData(onClientWrite);
+        terminal.onResize(({ cols, rows }) =>
+          onSend({ type: "resize", data: { cols, rows } }),
+        );
+      }
+
+      function onClientWrite(c) {
+        clientBuffer.push(c);
+
+        if (
+          c === "\r" ||
+          c === "\t" ||
+          clientBuffer.length > config.maxBuffer
+        ) {
+          return sendInput();
+        }
+
+        sendDelayed();
+      }
+
+      function onSend(data) {
+        if (currentSocket && currentSocket.OPEN === currentSocket.readyState) {
+          currentSocket.send(JSON.stringify(data));
+        }
+      }
+
+      function onStatusChange(newStatus) {
+        online.value = newStatus;
+
+        if (!newStatus && reconnect.value) {
+          setTimeout(connect, 5000);
+        }
+
+        if (newStatus) {
+          fitAddon.fit();
+        }
+      }
+
+      function onClose() {
+        reconnect.value = false;
+
+        if (currentSocket) {
+          onSend({ type: "close" });
+          currentSocket.close();
+        }
+
+        currentSocket = null;
+        terminal.write("\n\n");
+      }
+
+      function onMessage(message) {
+        const event = JSON.parse(message);
+
+        switch (event.type) {
+          case "close":
+            onClose();
+            break;
+
+          case "stdout":
+            const chunk = event.data;
+
+            if (typeof chunk === "string") {
+              terminal.write(chunk);
+              break;
+            }
+
+            if (chunk.type === "Buffer") {
+              const buffer = new ArrayBuffer(chunk.data.length);
+              const uint8 = new Uint8Array(buffer);
+              uint8.set(chunk.data, 0);
+              terminal.write(uint8);
+            }
+            break;
+        }
+      }
+
+      async function connect() {
+        const socket = new WebSocket(remote.value);
+
+        socket.addEventListener("message", (e) => onMessage(e.data));
+        socket.addEventListener("close", () => onStatusChange(false));
+        socket.addEventListener("open", () => onStatusChange(true));
+
+        currentSocket = socket;
+        setTimeout(() => fitAddon.fit(), 1000);
+      }
+
+      const addOn = new WeakRef(fitAddon);
+
+      onInit(() => {
+        createTerminal();
+        connect();
+        autofit.add(addOn);
+      });
+
+      onDestroy(() => {
+        autofit.delete(addOn);
+      });
+
+      function onReconnect() {
+        reconnect.value = true;
+        terminal.clear();
+        connect();
+      }
+
+      loadCss(
+        "https://cdnjs.cloudflare.com/ajax/libs/xterm/5.5.0/xterm.min.css",
+      );
+
+      return { onReconnect, onClose, online, name };
+    }
+  </script>
+</template>
