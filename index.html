@@ -28,8 +28,12 @@
         class="w-screen h-screen bg-gray-700 text-white p-4 flex flex-col items-center justify-between overflow-auto"
         on-dblclick="onAdd()"
       >
-        <template for="next of sessions">
-          <x-terminal bind-remote="next"></x-terminal>
+        <template for="session of sessions">
+          <x-terminal
+            bind-name="`session ${session.id}`"
+            bind-remote="session.remote"
+            on-close="onClose(session)"
+          ></x-terminal>
         </template>
       </div>
       <script setup>
@@ -41,10 +45,17 @@
           );
 
           function onAdd() {
-            const href = prompt("Remote session address (wss://.../)", "");
-            if (href) {
-              sessions.value.push(href.value);
+            const remote = prompt("Remote session address (wss://.../)", "");
+            if (remote) {
+              sessions.value.push({
+                id: ~~(Math.random() * 1000),
+                remote,
+              });
             }
+          }
+
+          function onClose(session) {
+            sessions.value = sessions.value.filter((x) => x !== session);
           }
 
           watch(
@@ -52,7 +63,7 @@
             localStorage.setItem("sessions", JSON.stringify(sessions.value)),
           );
 
-          return { oAdd, sessions, href };
+          return { onAdd, onClose, sessions };
         }
       </script>
     </template>

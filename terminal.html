@@ -11,13 +11,14 @@
       <button
         ref="status"
         class="rounded-full w-3 h-3 top-0 right-0 mr-2"
-        class-bg-green-400="online"
-        class-bg-yellow-400="!online"
+        bind-class="{
+          'bg-green-400': online,
+          'bg-yellow-400': !online,
+        }"
         on-click="onReconnect()"
       ></button>
 
       <button
-        ref="close"
         class="rounded-full w-3 h-3 top-0 right-0 bg-red-400"
         on-click="onClose()"
       ></button>
@@ -35,6 +36,7 @@
       ref,
       templateRef,
       defineProp,
+      defineEvent,
       onInit,
       onDestroy,
       loadCss,
@@ -69,15 +71,12 @@
     });
 
     export default function () {
-      const terminalRef = templateRef("terminal");
       const reconnect = ref(true);
       const online = ref(false);
+      const terminalRef = templateRef("terminal");
       const remote = defineProp("remote", { default: "" });
-      const name = defineProp("name", {
-        default() {
-          return "term-" + ~~(Math.random() * 100);
-        },
-      });
+      const onCloseEmitter = defineEvent("close");
+      const name = defineProp("name", { default: "untitled" });
 
       function sendInput() {
         const data = clientBuffer.join("");
@@ -88,6 +87,7 @@
       let currentSocket;
       let terminal;
       let fitAddon;
+
       const sendDelayed = debounce(sendInput);
       const clientBuffer = [];
 
@@ -145,6 +145,7 @@
 
         currentSocket = null;
         terminal.write("\n\n");
+        onCloseEmitter();
       }
 
       function onMessage(message) {
