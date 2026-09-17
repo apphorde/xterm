@@ -46,7 +46,7 @@ function validateEndpoint(value) {
 
 function renderSignedOut() {
   app.replaceChildren();
-  const header = element('header', undefined, 'mb-8 flex items-start justify-between gap-4 sm:mb-12');
+  const header = element('header', undefined, 'mb-6 flex items-start justify-between gap-4');
   const title = element('div');
   title.append(element('h1', 'xterm', 'text-4xl font-black tracking-tighter sm:text-5xl'));
   header.append(title);
@@ -64,7 +64,7 @@ function renderSignedIn(profile, initialServers) {
   let servers = initialServers;
   app.replaceChildren();
 
-  const header = element('header', undefined, 'mb-8 flex items-start justify-between gap-4 sm:mb-12');
+  const header = element('header', undefined, 'mb-6 flex items-center justify-between gap-4');
   const title = element('div');
   title.append(element('h1', 'xterm', 'text-4xl font-black tracking-tighter sm:text-5xl'));
   const account = element('div', '', 'flex items-center gap-3');
@@ -78,28 +78,37 @@ function renderSignedIn(profile, initialServers) {
   account.append(button('Sign out', 'border border-slate-600 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white', async () => { await signOut(); renderSignedOut(); }));
   header.append(title, account);
 
-  const listPanel = element('section', undefined, 'grid gap-4 rounded-2xl border border-slate-700 bg-slate-900/80 p-5 shadow-2xl');
-  const heading = element('div', undefined, 'flex items-baseline justify-between gap-4');
-  heading.append(element('h2', 'Your servers', 'text-lg font-semibold'), element('span', `${servers.length} saved`, 'text-sm text-slate-400'));
-  const list = element('div', undefined, 'grid gap-3');
+  const listPanel = element('section', undefined, 'overflow-hidden rounded-xl border border-slate-700 bg-slate-900/80 shadow-xl');
+  const heading = element('div', undefined, 'flex items-baseline justify-between gap-4 border-b border-slate-700 px-4 py-3');
+  heading.append(element('h2', 'Your servers', 'font-semibold'), element('span', `${servers.length} saved`, 'text-xs text-slate-400'));
+  const tableWrap = element('div', undefined, 'overflow-x-auto');
+  const table = element('table', undefined, 'w-full text-left text-sm');
+  const thead = element('thead', undefined, 'bg-slate-800/70 text-xs uppercase tracking-wide text-slate-400');
+  const headRow = element('tr');
+  headRow.append(element('th', 'Endpoint', 'px-4 py-2 font-medium'), element('th', 'Actions', 'px-4 py-2 text-right font-medium'));
+  thead.append(headRow);
+  const list = element('tbody');
 
   function renderList() {
     list.replaceChildren();
     heading.lastChild.textContent = `${servers.length} saved`;
     if (!servers.length) {
-      list.append(element('p', 'Add a websocket endpoint below to get started.', 'py-2 text-slate-400'));
+      const row = element('tr');
+      const cell = element('td', 'Add a server below to get started.', 'px-4 py-4 text-slate-400');
+      cell.colSpan = 2;
+      row.append(cell);
+      list.append(row);
       return;
     }
     servers.forEach((server, index) => {
-      const row = element('div', undefined, 'flex flex-col justify-between gap-3 rounded-xl border border-slate-700 bg-slate-800/80 p-4 sm:flex-row sm:items-center');
-      row.append(element('span', server.endpoint, 'break-all font-mono text-sm text-slate-200'));
-      const actions = element('div', '');
-      actions.className = 'flex shrink-0 gap-2';
+      const row = element('tr', undefined, 'border-t border-slate-800');
+      row.append(element('td', server.endpoint, 'break-all px-4 py-3 font-mono text-xs text-slate-200'));
+      const actions = element('td', '', 'whitespace-nowrap px-4 py-3 text-right');
       actions.append(button('Connect', '', () => {
         sessionStorage.setItem('xterm.connection', JSON.stringify(server));
-        location.href = '/terminal-page.html';
+        showTerminal(profile, servers);
       }));
-      actions.append(button('Remove', 'border border-rose-900 bg-transparent text-rose-300 hover:bg-rose-950', async () => {
+      actions.append(button('Remove', 'ml-2 border border-rose-900 bg-transparent text-rose-300 hover:bg-rose-950', async () => {
         servers = servers.filter((_, itemIndex) => itemIndex !== index);
         await saveServers(servers);
         renderList();
@@ -109,16 +118,18 @@ function renderSignedIn(profile, initialServers) {
     });
   }
   renderList();
-  listPanel.append(heading, list);
+  table.append(thead, list);
+  tableWrap.append(table);
+  listPanel.append(heading, tableWrap);
 
-  const addPanel = element('section', undefined, 'mt-4 grid gap-4 rounded-2xl border border-slate-700 bg-slate-900/80 p-5 shadow-2xl');
-  addPanel.append(element('h2', 'Add a server', 'text-lg font-semibold'));
-  const form = element('form', undefined, 'grid gap-3 sm:grid-cols-[1.2fr_1fr_auto]');
-  const endpointLabel = element('label', 'Endpoint', 'grid gap-2 text-xs text-slate-400');
+  const addPanel = element('section', undefined, 'mt-3 rounded-xl border border-slate-700 bg-slate-900/80 p-4 shadow-xl');
+  addPanel.append(element('h2', 'Add a server', 'mb-3 font-semibold'));
+  const form = element('form', undefined, 'grid gap-2 sm:grid-cols-[1.2fr_1fr_auto] sm:items-end');
+  const endpointLabel = element('label', 'Endpoint', 'grid gap-1 text-xs text-slate-400');
   const endpoint = element('input', undefined, 'w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-300 focus:ring-1 focus:ring-emerald-300');
   endpoint.type = 'url'; endpoint.required = true; endpoint.placeholder = 'wss://server.example/ws';
   endpointLabel.append(endpoint);
-  const keyLabel = element('label', 'Auth key', 'grid gap-2 text-xs text-slate-400');
+  const keyLabel = element('label', 'Auth key', 'grid gap-1 text-xs text-slate-400');
   const key = element('input', undefined, 'w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-300 focus:ring-1 focus:ring-emerald-300');
   key.type = 'password'; key.required = true; key.placeholder = 'Secret key';
   keyLabel.append(key);
@@ -141,6 +152,18 @@ function renderSignedIn(profile, initialServers) {
   });
   addPanel.append(form, error);
   app.append(header, listPanel, addPanel);
+}
+
+function showTerminal(profile, servers) {
+  app.replaceChildren();
+  const shell = element('section', undefined, 'fixed inset-0 flex flex-col bg-black');
+  const toolbar = element('div', undefined, 'flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-950 px-3 py-2');
+  toolbar.append(element('span', 'xterm', 'font-semibold text-slate-200'));
+  toolbar.append(button('Back to servers', 'border border-slate-600 bg-transparent text-slate-300 hover:bg-slate-800', () => renderSignedIn(profile, servers)));
+  const terminal = document.createElement('x-terminal');
+  terminal.className = 'min-h-0 flex-1';
+  shell.append(toolbar, terminal);
+  app.append(shell);
 }
 
 async function start() {
