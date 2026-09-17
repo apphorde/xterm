@@ -16,10 +16,22 @@ function element(tag, text, className) {
   return node;
 }
 
-function button(text, className, onClick) {
-  const baseClass = 'rounded-lg bg-emerald-300 px-4 py-2 font-bold text-slate-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50';
-  const node = element('button', text, `${baseClass} ${className || ''}`);
+function button(text, className, onClick, icon) {
+  const baseClass = 'rounded-lg bg-emerald-300 px-4 py-2 font-bold transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50';
+  const node = element('button', undefined, `${baseClass} ${className || ''}`);
   node.type = 'button';
+  if (icon) {
+    const iconElement = document.createElement('lucide-icon');
+    iconElement.setAttribute('icon', icon);
+    iconElement.setAttribute('size', '16');
+    iconElement.className = 'sm:hidden';
+    iconElement.setAttribute('aria-hidden', 'true');
+    node.append(iconElement, element('span', text, 'hidden sm:inline'));
+    node.setAttribute('aria-label', text);
+    node.title = text;
+  } else {
+    node.textContent = text;
+  }
   node.addEventListener('click', onClick);
   return node;
 }
@@ -52,7 +64,7 @@ function renderSignedOut() {
   header.append(title);
   const panel = element('section', undefined, 'grid gap-4 rounded-2xl border border-slate-700 bg-slate-900/80 p-5 shadow-2xl');
   panel.append(element('h2', 'Sign in to continue', 'text-lg font-semibold'), element('p', 'Your server list and keys are stored privately with your auth account.', 'text-slate-400'));
-  panel.append(button('Sign in', '', () => signIn(false)));
+  panel.append(button('Sign in', 'text-slate-950', () => signIn(false)));
   app.append(header, panel);
 }
 
@@ -104,15 +116,15 @@ function renderSignedIn(profile, initialServers) {
       const row = element('tr', undefined, 'border-t border-slate-800');
       row.append(element('td', server.endpoint, 'break-all px-4 py-3 font-mono text-xs text-slate-200'));
       const actions = element('td', '', 'whitespace-nowrap px-4 py-3 text-right');
-      actions.append(button('Connect', '', () => {
+      actions.append(button('Connect', 'px-3 text-slate-950 sm:px-4', () => {
         sessionStorage.setItem('xterm.connection', JSON.stringify(server));
         showTerminal(profile, servers);
-      }));
-      actions.append(button('Remove', 'ml-2 border border-rose-900 bg-transparent text-rose-300 hover:bg-rose-950', async () => {
+      }, 'plug-2'));
+      actions.append(button('Remove', 'ml-2 px-3 sm:px-4 border border-rose-900 bg-transparent text-slate-200 hover:bg-rose-950', async () => {
         servers = servers.filter((_, itemIndex) => itemIndex !== index);
         await saveServers(servers);
         renderList();
-      }));
+      }, 'trash-2'));
       row.append(actions);
       list.append(row);
     });
@@ -133,7 +145,7 @@ function renderSignedIn(profile, initialServers) {
   const key = element('input', undefined, 'w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-300 focus:ring-1 focus:ring-emerald-300');
   key.type = 'password'; key.required = true; key.placeholder = 'Secret key';
   keyLabel.append(key);
-  const submit = button('Add server', 'self-end'); submit.type = 'submit';
+  const submit = button('Add server', 'self-end text-slate-950'); submit.type = 'submit';
   const error = element('p', '', 'text-rose-300');
   form.append(endpointLabel, keyLabel, submit);
   form.addEventListener('submit', async (event) => {
@@ -167,6 +179,7 @@ function showTerminal(profile, servers) {
 }
 
 async function start() {
+  renderSignedOut();
   try {
     const profile = await getProfile();
     const stored = await getPropertyNS(propertyName);
