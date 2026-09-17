@@ -126,7 +126,7 @@ function renderSignedIn(profile, initialServers) {
         servers = servers.filter((_, itemIndex) => itemIndex !== index);
         await saveServers(servers);
         renderList();
-      }, 'trash-2', false));
+      }, 'trash', false));
       row.append(actions);
       list.append(row);
     });
