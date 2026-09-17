@@ -159,6 +159,8 @@ export default function () {
       if (!remote.value || !key.value) throw new Error('Select a server from the server list first');
       const token = await getToken(remote.value, key.value);
       const url = new URL(remote.value);
+      if (url.protocol === 'http:') url.protocol = 'ws:';
+      if (url.protocol === 'https:') url.protocol = 'wss:';
       url.searchParams.set('token', token);
 
       const socket = new WebSocket(url);

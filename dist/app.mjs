@@ -37,7 +37,7 @@ function readServers(value) {
 function validateEndpoint(value) {
   try {
     const url = new URL(value);
-    return ['ws:', 'wss:'].includes(url.protocol) ? url.toString() : null;
+    return ['http:', 'https:', 'ws:', 'wss:'].includes(url.protocol) ? url.toString() : null;
   } catch {
     return null;
   }
@@ -47,7 +47,7 @@ function renderSignedOut() {
   app.replaceChildren();
   const header = element('header');
   const title = element('div');
-  title.append(element('p', 'PRIVATE TERMINAL ACCESS', 'eyebrow'), element('h1', 'xterm'));
+  title.append(element('h1', 'xterm'));
   header.append(title);
   const panel = element('section', undefined, 'panel');
   panel.append(element('h2', 'Sign in to continue'), element('p', 'Your server list and keys are stored privately with your auth account.', 'muted'));
@@ -65,7 +65,7 @@ function renderSignedIn(profile, initialServers) {
 
   const header = element('header');
   const title = element('div');
-  title.append(element('p', 'PRIVATE TERMINAL ACCESS', 'eyebrow'), element('h1', 'xterm'));
+  title.append(element('h1', 'xterm'));
   const account = element('div', '');
   account.className = 'profile';
   if (profile.photo) {
@@ -127,7 +127,7 @@ function renderSignedIn(profile, initialServers) {
   form.addEventListener('submit', async (event) => {
     event.preventDefault(); error.textContent = '';
     const normalized = validateEndpoint(endpoint.value.trim());
-    if (!normalized) { error.textContent = 'Use a valid ws:// or wss:// endpoint.'; return; }
+    if (!normalized) { error.textContent = 'Use a valid http(s):// or ws(s):// endpoint.'; return; }
     if (servers.some((server) => server.endpoint === normalized)) { error.textContent = 'That endpoint is already saved.'; return; }
     submit.disabled = true;
     try {
