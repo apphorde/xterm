@@ -1,0 +1,80 @@
+<template component="lucide-icon">
+  <span ref="svg" attr-aria-label="label || ''"></span>
+
+  <script setup>
+    import { computed, effect, templateRef, shallowRef, watch, defineProp } from '@li3/web';
+
+    const cache = {};
+    let ce;
+
+    export async function createElement(name) {
+      if (!ce) {
+        const mod = await import('https://unpkg.com/lucide@latest/dist/esm/createElement.mjs');
+        ce = mod.default;
+      }
+
+      return ce(name);
+    }
+
+    export async function loadIcon(name) {
+      try {
+        const mod = await import(`https://unpkg.com/lucide@latest/dist/esm/icons/${name}.mjs`);
+        const icon = mod.default;
+        return createElement(icon);
+      } catch {
+        throw new Error('Icon not found: ' + name);
+      }
+    }
+
+    export default function () {
+      const svg = templateRef('svg').value;
+      const iconClasses = defineProp('iconClasses');
+      const icon = defineProp('icon', { attribute: true });
+      const label = defineProp('label', { attribute: true });
+      const size = defineProp('size', { attribute: true });
+      const iconEl = shallowRef(null);
+
+      const updateSizeAndClasses = () => {
+        const svgIcon = svg.firstChild;
+
+        if (!svgIcon) return;
+
+        svgIcon.className.baseVal = iconClasses.value || '';
+
+        const s = String(size.value || '');
+
+        if (s) {
+          svgIcon.setAttribute('width', s);
+          svgIcon.setAttribute('height', s);
+        }
+      };
+
+      watch(iconEl, () => {
+        if (!iconEl.value) return;
+
+        const svgIcon = iconEl.value.cloneNode(true);
+
+        svg.innerHTML = '';
+        svg.appendChild(svgIcon);
+        updateSizeAndClasses();
+      });
+
+      effect(() => icon.value + iconClasses.value + size.value, updateSizeAndClasses);
+
+      watch(icon, async function update() {
+        if (!icon.value?.trim()) {
+          svg.innerHTML = '';
+          return;
+        }
+
+        const newIcon = String(icon.value);
+
+        if (!cache[newIcon]) {
+          cache[newIcon] = loadIcon(newIcon);
+        }
+
+        iconEl.value = await cache[newIcon];
+      });
+    }
+  </script>
+</template>
