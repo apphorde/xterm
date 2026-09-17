@@ -1,5 +1,8 @@
 {
   "name": "xterm",
   "private": true,
-  "packageManager": "pnpm@12.4.2"
+  "packageManager": "pnpm@12.4.2",
+  "scripts": {
+    "build": "node --check dist/app.mjs && node --check dist/terminal.mjs"
+  }
 }
