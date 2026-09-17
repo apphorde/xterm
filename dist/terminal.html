@@ -3,7 +3,7 @@
     <div class="flex w-full items-center flex-1 pb-2 space-x-1 font-mono text-white text-sm">
       <div class="w-2/3">
         <span>{{ remote }}</span>
-        <span>{{ key.slice(4, 12) }}...</span>
+        <span>{{ key ? key.slice(4, 12) + '...' : '' }}</span>
       </div>
       <div class="w-1/3">
         <button
@@ -18,6 +18,8 @@
     </div>
     <div ref="terminal" class="w-full h-full overflow-hidden"></div>
   </div>
+
+  <a href="/" class="absolute top-2 left-2 z-10 rounded bg-gray-700 px-2 py-1 text-xs text-white">Servers</a>
 
   <script setup src="/terminal.mjs"></script>
 </template>

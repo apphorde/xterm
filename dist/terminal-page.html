@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>xterm terminal</title>
+    <link rel="component" href="/terminal.html" />
+    <link rel="component" href="https://sodium.static.apphor.de/lucide-icon.html" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.5.0/xterm.min.css" />
+    <script type="importmap">
+      { "imports": { "@li3/": "https://at-li3.static.apphor.de/" } }
+    </script>
+    <script type="module">import '@li3/web';</script>
+  </head>
+  <body class="w-screen h-screen overflow-auto block flex flex-col items-stretch justify-stretch">
+    <app-terminal class="contents"></app-terminal>
+  </body>
+</html>

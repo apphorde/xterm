@@ -25,8 +25,15 @@ window.addEventListener('resize', () => {
 
 export default function () {
   const href = new URL(location.href);
+  const saved = (() => {
+    try {
+      return JSON.parse(sessionStorage.getItem('xterm.connection') || '{}');
+    } catch {
+      return {};
+    }
+  })();
   const [key, setKey] = hook('');
-  const [remote, setRemote] = hook(decodeURIComponent(href.searchParams.get('remote')));
+  const [remote, setRemote] = hook(saved.endpoint || href.searchParams.get('remote') || '');
   const reconnect = ref(true);
   const online = ref(false);
   const terminalRef = templateRef('terminal');
@@ -38,19 +45,19 @@ export default function () {
   let terminal;
   let fitAddon;
 
-  if (!remote.value) {
-    setRemote(prompt('Remote URL'));
-  }
-
-  setKey(prompt('Auth key'));
+  setKey(saved.key || '');
 
   async function getToken(remote, key) {
-    const res = await fetch(new URL('/auth', remote), {
+    const authUrl = new URL('/auth', remote.replace(/^ws/, 'http'));
+    const res = await fetch(authUrl, {
       method: 'POST',
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ key }),
     });
 
+    if (!res.ok) throw new Error(`Authentication failed (${res.status})`);
     const { token } = await res.json();
+    if (!token) throw new Error('Remote server did not return a token');
     return token;
   }
 
@@ -116,7 +123,13 @@ export default function () {
   }
 
   function onMessage(message) {
-    const event = JSON.parse(message);
+    let event;
+    try {
+      event = JSON.parse(message);
+    } catch {
+      terminal.write('\r\nReceived invalid server data\r\n');
+      return;
+    }
 
     switch (event.type) {
       case 'close':
@@ -142,18 +155,24 @@ export default function () {
   }
 
   async function connect() {
-    const token = await getToken(remote.value, key.value);
-    const url = new URL(remote.value);
-    url.searchParams.set('token', token);
+    try {
+      if (!remote.value || !key.value) throw new Error('Select a server from the server list first');
+      const token = await getToken(remote.value, key.value);
+      const url = new URL(remote.value);
+      url.searchParams.set('token', token);
 
-    const socket = new WebSocket(url);
+      const socket = new WebSocket(url);
+      socket.addEventListener('message', (e) => onMessage(e.data));
+      socket.addEventListener('close', () => onStatusChange(false));
+      socket.addEventListener('open', () => onStatusChange(true));
+      socket.addEventListener('error', () => terminal.write('\r\nConnection error\r\n'));
 
-    socket.addEventListener('message', (e) => onMessage(e.data));
-    socket.addEventListener('close', () => onStatusChange(false));
-    socket.addEventListener('open', () => onStatusChange(true));
-
-    currentSocket = socket;
-    setTimeout(() => fitAddon.fit(), 1000);
+      currentSocket = socket;
+      setTimeout(() => fitAddon.fit(), 1000);
+    } catch (cause) {
+      terminal.write(`\r\n${cause.message}\r\n`);
+      onStatusChange(false);
+    }
   }
 
   onInit(() => {

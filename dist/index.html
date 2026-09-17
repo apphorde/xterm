@@ -4,23 +4,40 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>xterm</title>
-    <link rel="component" href="/terminal.html" />
     <link rel="component" href="https://sodium.static.apphor.de/lucide-icon.html" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.5.0/xterm.min.css" />
-
-    <script type="importmap">
-      {
-        "imports": {
-          "@li3/": "https://at-li3.static.apphor.de/"
-        }
-      }
-    </script>
-    <script type="module">
-      import '@li3/web';
-    </script>
+    <style>
+      :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #09111f; color: #e5edf7; }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 80% 0%, #17345a, transparent 36rem), #09111f; }
+      main { width: min(58rem, calc(100% - 2rem)); margin: 0 auto; padding: 4rem 0; }
+      header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 3rem; }
+      h1, h2, p { margin: 0; }
+      h1 { font-size: clamp(2.4rem, 7vw, 4.8rem); letter-spacing: -.07em; line-height: .9; }
+      h2 { font-size: 1.15rem; }
+      .eyebrow { color: #69e0b3; font-size: .72rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; margin-bottom: 1rem; }
+      .muted { color: #93a6bd; }
+      .panel { background: rgba(15, 30, 51, .84); border: 1px solid #284361; border-radius: 1rem; padding: 1.25rem; box-shadow: 0 1rem 4rem rgba(0, 0, 0, .2); }
+      .panel + .panel { margin-top: 1rem; }
+      .section-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; margin-bottom: 1rem; }
+      .server-list { display: grid; gap: .7rem; }
+      .server { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .9rem 1rem; border: 1px solid #2c4865; border-radius: .75rem; background: #10243d; }
+      .server-endpoint { color: #d7e4f2; font-family: ui-monospace, SFMono-Regular, monospace; overflow-wrap: anywhere; }
+      form { display: grid; grid-template-columns: 1.2fr 1fr auto; gap: .7rem; }
+      label { display: grid; gap: .4rem; color: #93a6bd; font-size: .78rem; }
+      input { width: 100%; border: 1px solid #3a5875; border-radius: .55rem; background: #091827; color: #eef6ff; padding: .7rem .8rem; font: inherit; }
+      input:focus { outline: 2px solid #69e0b3; outline-offset: 1px; }
+      button { border: 0; border-radius: .55rem; background: #69e0b3; color: #092019; cursor: pointer; font: inherit; font-weight: 800; padding: .7rem 1rem; }
+      button.secondary { background: transparent; border: 1px solid #45627e; color: #c9d8e8; }
+      button.danger { color: #ff9f9f; border-color: #784b59; }
+      .empty { color: #93a6bd; padding: .6rem 0; }
+      .error { color: #ffb3b3; margin-top: .8rem; }
+      .profile { display: flex; align-items: center; gap: .7rem; }
+      .avatar { width: 2rem; height: 2rem; border-radius: 50%; object-fit: cover; background: #284361; }
+      @media (max-width: 42rem) { main { padding: 2rem 0; } header { margin-bottom: 2rem; } form { grid-template-columns: 1fr; } .server { align-items: stretch; flex-direction: column; } }
+    </style>
   </head>
-  <body class="w-screen h-screen overflow-auto block flex flex-col items-stretch justify-stretch">
-    <app-terminal class="contents"></app-terminal>
+  <body>
+    <main id="app" aria-live="polite"></main>
+    <script type="module" src="/app.mjs"></script>
   </body>
 </html>
