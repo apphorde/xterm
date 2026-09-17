@@ -16,8 +16,10 @@ function element(tag, text, className) {
   return node;
 }
 
-function button(text, className, onClick, icon) {
-  const baseClass = 'rounded-lg bg-emerald-300 px-4 py-2 font-bold transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50';
+function button(text, className, onClick, icon, primary = true) {
+  const baseClass = primary
+    ? 'rounded bg-emerald-300 px-2 py-1 font-semi text-slate-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50'
+    : 'rounded border border-slate-600 bg-slate-800 px-2 py-1 font-semi text-slate-200 transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50';
   const node = element('button', undefined, `${baseClass} ${className || ''}`);
   node.type = 'button';
   if (icon) {
@@ -87,7 +89,7 @@ function renderSignedIn(profile, initialServers) {
     account.append(avatar);
   }
   account.append(element('span', profile.name || profile.displayName || profile.email || 'Account', 'hidden text-sm text-slate-300 sm:inline'));
-  account.append(button('Sign out', 'border border-slate-600 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white', async () => { await signOut(); renderSignedOut(); }));
+  account.append(button('Sign out', 'hover:text-white', async () => { await signOut(); renderSignedOut(); }, undefined, false));
   header.append(title, account);
 
   const listPanel = element('section', undefined, 'overflow-hidden rounded-xl border border-slate-700 bg-slate-900/80 shadow-xl');
@@ -116,15 +118,15 @@ function renderSignedIn(profile, initialServers) {
       const row = element('tr', undefined, 'border-t border-slate-800');
       row.append(element('td', server.endpoint, 'break-all px-4 py-3 font-mono text-xs text-slate-200'));
       const actions = element('td', '', 'whitespace-nowrap px-4 py-3 text-right');
-      actions.append(button('Connect', 'px-3 text-slate-950 sm:px-4', () => {
+      actions.append(button('Connect', '', () => {
         sessionStorage.setItem('xterm.connection', JSON.stringify(server));
         showTerminal(profile, servers);
       }, 'plug-2'));
-      actions.append(button('Remove', 'ml-2 px-3 sm:px-4 border border-rose-900 bg-transparent text-slate-200 hover:bg-rose-950', async () => {
+      actions.append(button('Remove', 'ml-2 border-rose-900 text-rose-300 hover:bg-rose-950', async () => {
         servers = servers.filter((_, itemIndex) => itemIndex !== index);
         await saveServers(servers);
         renderList();
-      }, 'trash-2'));
+      }, 'trash-2', false));
       row.append(actions);
       list.append(row);
     });
@@ -171,7 +173,7 @@ function showTerminal(profile, servers) {
   const shell = element('section', undefined, 'fixed inset-0 flex flex-col bg-black');
   const toolbar = element('div', undefined, 'flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-950 px-3 py-2');
   toolbar.append(element('span', 'xterm', 'font-semibold text-slate-200'));
-  toolbar.append(button('Back to servers', 'border border-slate-600 bg-transparent text-slate-300 hover:bg-slate-800', () => renderSignedIn(profile, servers)));
+  toolbar.append(button('Back to servers', '', () => renderSignedIn(profile, servers), undefined, false));
   const terminal = document.createElement('x-terminal');
   terminal.className = 'min-h-0 flex-1';
   shell.append(toolbar, terminal);
