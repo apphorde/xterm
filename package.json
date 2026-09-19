@@ -3,6 +3,10 @@
   "private": true,
   "packageManager": "pnpm@12.4.2",
   "scripts": {
-    "build": "node --check dist/app.mjs && node --check dist/terminal.mjs"
+    "build": "node --check index.mjs && node --check static-server.mjs && node --check terminal-server.mjs && node --check dist/app.mjs && node --check dist/terminal.mjs"
+  },
+  "dependencies": {
+    "node-pty": "^1.1.0",
+    "ws": "^8.18.0"
   }
 }
