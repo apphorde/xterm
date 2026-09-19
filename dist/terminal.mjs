@@ -48,11 +48,11 @@ export default function () {
   setKey(saved.key || '');
 
   async function getToken(remote, key) {
-    const authUrl = new URL('/auth', remote.replace(/^ws/, 'http'));
-    const res = await fetch(authUrl, {
+    const res = await fetch('/proxy/auth', {
+      credentials: 'include',
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ key }),
+      body: JSON.stringify({ endpoint: remote, key }),
     });
 
     if (!res.ok) throw new Error(`Authentication failed (${res.status})`);
@@ -158,9 +158,8 @@ export default function () {
     try {
       if (!remote.value || !key.value) throw new Error('Select a server from the server list first');
       const token = await getToken(remote.value, key.value);
-      const url = new URL(remote.value);
-      if (url.protocol === 'http:') url.protocol = 'ws:';
-      if (url.protocol === 'https:') url.protocol = 'wss:';
+      const url = new URL('/proxy/connect', location.href);
+      url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
       url.searchParams.set('token', token);
 
       const socket = new WebSocket(url);

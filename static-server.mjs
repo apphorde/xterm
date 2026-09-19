@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createUiProxy } from './ui-proxy.mjs';
 
 const root = fileURLToPath(new URL('./dist/', import.meta.url));
 const port = Number(process.env.PORT || 3000);
@@ -13,6 +14,7 @@ const contentTypes = {
   '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml',
 };
+const proxy = createUiProxy();
 
 function send(response, status, body, headers = {}) {
   response.writeHead(status, headers);
@@ -35,7 +37,8 @@ async function getFile(pathname) {
   return info.isFile() ? file : null;
 }
 
-createServer(async (request, response) => {
+const server = createServer(async (request, response) => {
+  if (proxy.handleRequest(request, response)) return;
   if (!['GET', 'HEAD'].includes(request.method)) {
     send(response, 405, 'Method Not Allowed', { Allow: 'GET, HEAD' });
     return;
@@ -62,4 +65,9 @@ createServer(async (request, response) => {
   } catch {
     send(response, 400, 'Bad Request', { 'content-type': 'text/plain; charset=utf-8' });
   }
-}).listen(port);
+});
+
+server.on('upgrade', (request, socket, head) => {
+  if (!proxy.handleUpgrade(request, socket, head)) socket.destroy();
+});
+server.listen(port);
