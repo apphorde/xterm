@@ -67,7 +67,7 @@ function renderSignedOut() {
   header.append(title);
   const panel = element('section', undefined, 'grid gap-4 rounded-2xl border border-slate-700 bg-slate-900/80 p-5 shadow-2xl');
   panel.append(element('h2', 'Sign in to continue', 'text-lg font-semibold'), element('p', 'Your server list and keys are stored privately with your auth account.', 'text-slate-400'));
-  panel.append(button('Sign in', 'text-slate-950', () => signIn(false)));
+  panel.append(button('Sign in', 'w-fit text-slate-950 shadow-lg shadow-emerald-950/30', () => signIn(false)));
   app.append(header, panel);
 }
 

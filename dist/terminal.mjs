@@ -117,12 +117,14 @@ export default function () {
     reconnect.value = false;
     window.removeEventListener('xterm-close', onClose);
 
-    if (currentSocket) {
-      onSend('close');
-      currentSocket.close();
+    const socket = currentSocket;
+    currentSocket = null;
+    online.value = false;
+    if (socket) {
+      if (socket.readyState === socket.OPEN) socket.send(JSON.stringify({ type: 'close' }));
+      if (socket.readyState !== socket.CLOSED) socket.close();
     }
 
-    currentSocket = null;
     terminal.write('\n\n');
   }
 

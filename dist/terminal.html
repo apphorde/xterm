@@ -5,7 +5,10 @@
         <span class="h-2.5 w-2.5 shrink-0 rounded-full bg-yellow-400" bind-class="{ 'bg-green-400': online, 'bg-yellow-400': !online }" aria-label="Connection status"></span>
         <span class="truncate">{{ remote }}</span>
       </div>
-      <div class="shrink-0 pl-3">
+      <div class="flex shrink-0 gap-2 pl-3">
+        <button class="hidden rounded border border-yellow-700 bg-yellow-950 px-2 py-1 text-xs text-yellow-200 hover:bg-yellow-900" bind-class="{ 'hidden': online }" on-click="onReconnect()">
+          Reconnect
+        </button>
         <button class="rounded border border-red-900 bg-red-950 px-2 py-1 text-xs text-red-200 hover:bg-red-900" on-click="onClose()">
           Close
         </button>
