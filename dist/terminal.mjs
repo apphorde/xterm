@@ -112,6 +112,7 @@ export default function () {
 
   function onClose() {
     reconnect.value = false;
+    window.removeEventListener('xterm-close', onClose);
 
     if (currentSocket) {
       onSend('close');
@@ -121,6 +122,8 @@ export default function () {
     currentSocket = null;
     terminal.write('\n\n');
   }
+
+  window.addEventListener('xterm-close', onClose);
 
   async function onMessage(message) {
     let text;

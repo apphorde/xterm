@@ -173,7 +173,10 @@ function showTerminal(profile, servers) {
   const shell = element('section', undefined, 'fixed inset-0 flex flex-col bg-black');
   const toolbar = element('div', undefined, 'flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-950 px-3 py-2');
   toolbar.append(element('span', 'xterm', 'font-semibold text-slate-200'));
-  toolbar.append(button('Back to servers', '', () => renderSignedIn(profile, servers), undefined, false));
+  toolbar.append(button('Back to servers', '', () => {
+    window.dispatchEvent(new Event('xterm-close'));
+    renderSignedIn(profile, servers);
+  }, undefined, false));
   const terminal = document.createElement('x-terminal');
   terminal.className = 'min-h-0 flex-1';
   shell.append(toolbar, terminal);
