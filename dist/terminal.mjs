@@ -1,4 +1,4 @@
-import { ref, hook, templateRef, onInit } from '@li3/web';
+import { ref, hook, templateRef, onInit, defineProp } from '@li3/web';
 import { Terminal } from 'https://unpkg.com/@xterm/xterm@6/lib/xterm.mjs';
 import { FitAddon } from 'https://unpkg.com/@xterm/addon-fit@0.11.0/lib/addon-fit.mjs';
 
@@ -25,7 +25,10 @@ window.addEventListener('resize', () => {
 
 export default function () {
   const href = new URL(location.href);
+  const connectionId = defineProp('connectionId', { attribute: true });
   const saved = (() => {
+    const connection = window.xtermConnections?.get(connectionId.value);
+    if (connection) return connection;
     try {
       return JSON.parse(sessionStorage.getItem('xterm.connection') || '{}');
     } catch {

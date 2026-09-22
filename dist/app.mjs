@@ -8,6 +8,7 @@ import {
 
 const app = document.querySelector('#app');
 const propertyName = 'servers';
+window.xtermConnections ||= new Map();
 
 function element(tag, text, className) {
   const node = document.createElement(tag);
@@ -119,8 +120,7 @@ function renderSignedIn(profile, initialServers) {
       row.append(element('td', server.endpoint, 'break-all px-4 py-3 font-mono text-xs text-slate-200'));
       const actions = element('td', '', 'whitespace-nowrap px-4 py-3 text-right');
       actions.append(button('Connect', '', () => {
-        sessionStorage.setItem('xterm.connection', JSON.stringify(server));
-        showTerminal(profile, servers);
+        showTerminalWorkspace(profile, servers, server);
       }, 'plug-2'));
       actions.append(button('Remove', 'ml-2 border-rose-900 text-rose-300 hover:bg-rose-950', async () => {
         servers = servers.filter((_, itemIndex) => itemIndex !== index);
@@ -168,19 +168,78 @@ function renderSignedIn(profile, initialServers) {
   app.append(header, listPanel, addPanel);
 }
 
-function showTerminal(profile, servers) {
+function showTerminalWorkspace(profile, servers, firstServer) {
   app.replaceChildren();
   const shell = element('section', undefined, 'fixed inset-0 flex flex-col bg-black');
   const toolbar = element('div', undefined, 'flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-950 px-3 py-2');
   toolbar.append(element('span', 'xterm', 'font-semibold text-slate-200'));
-  toolbar.append(button('Back to servers', '', () => {
-    window.dispatchEvent(new Event('xterm-close'));
-    renderSignedIn(profile, servers);
-  }, undefined, false));
-  const terminal = document.createElement('x-terminal');
-  terminal.className = 'min-h-0 flex-1';
-  shell.append(toolbar, terminal);
+  const workspace = { profile, servers, sessions: [], tabs: null, panels: null };
+  toolbar.append(button('New connection', '', () => openConnectionDialog(workspace), 'plus', false));
+  const tabs = element('nav', undefined, 'flex shrink-0 gap-1 overflow-x-auto border-b border-slate-800 bg-slate-950 px-2 py-1');
+  const panels = element('div', undefined, 'min-h-0 flex-1');
+  workspace.tabs = tabs;
+  workspace.panels = panels;
+
+  function activate(id) {
+    for (const session of workspace.sessions) {
+      const active = session.id === id;
+      session.panel.classList.toggle('hidden', !active);
+      session.tab.className = active
+        ? 'shrink-0 rounded bg-slate-700 px-3 py-1 text-xs text-white'
+        : 'shrink-0 rounded px-3 py-1 text-xs text-slate-400 hover:bg-slate-800 hover:text-white';
+    }
+  }
+
+  workspace.addSession = (server) => {
+    const id = crypto.randomUUID();
+    window.xtermConnections.set(id, server);
+    const tab = element('button', server.endpoint, 'shrink-0 rounded px-3 py-1 text-xs text-slate-400 hover:bg-slate-800 hover:text-white');
+    tab.type = 'button';
+    const panel = element('div', undefined, 'hidden h-full min-h-0');
+    const terminal = document.createElement('x-terminal');
+    terminal.setAttribute('connectionId', id);
+    terminal.className = 'block h-full min-h-0';
+    tab.addEventListener('click', () => activate(id));
+    panel.append(terminal);
+    tabs.append(tab);
+    panels.append(panel);
+    workspace.sessions.push({ id, panel, tab });
+    activate(id);
+  };
+
+  shell.append(toolbar, tabs, panels);
   app.append(shell);
+  workspace.addSession(firstServer);
+}
+
+function openConnectionDialog(workspace) {
+  const overlay = element('div', undefined, 'fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4');
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  const dialog = element('div', undefined, 'w-full max-w-xl overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-2xl');
+  const heading = element('div', undefined, 'flex items-center justify-between border-b border-slate-700 px-4 py-3');
+  heading.append(element('h2', 'Open a connection', 'font-semibold'));
+  heading.append(button('Close', '', () => overlay.remove(), 'x', false));
+  const list = element('div', undefined, 'max-h-[60vh] overflow-y-auto p-2');
+  if (!workspace.servers.length) {
+    list.append(element('p', 'No saved servers are available.', 'p-3 text-sm text-slate-400'));
+  } else {
+    for (const server of workspace.servers) {
+      const row = element('div', undefined, 'flex items-center justify-between gap-3 rounded px-3 py-2 hover:bg-slate-800');
+      row.append(element('span', server.endpoint, 'break-all font-mono text-xs text-slate-200'));
+      row.append(button('Connect', '', () => {
+        overlay.remove();
+        workspace.addSession(server);
+      }, 'plug-2'));
+      list.append(row);
+    }
+  }
+  dialog.append(heading, list);
+  overlay.append(dialog);
+  overlay.addEventListener('click', (event) => {
+    if (event.target === overlay) overlay.remove();
+  });
+  document.body.append(overlay);
 }
 
 async function start() {
