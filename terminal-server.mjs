@@ -123,7 +123,7 @@ function onUpgrade(request, socket, head) {
 function createShell(websocket) {
   const shellEnv = { ...process.env };
   delete shellEnv.WS_AUTH_KEY;
-  const shell = pty.spawn(process.env.SHELL || '/bin/sh', ['-l'], {
+  const shell = pty.spawn('login', [], {
     cols: 80,
     cwd: process.env.HOME || process.cwd(),
     env: shellEnv,
