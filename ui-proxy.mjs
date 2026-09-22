@@ -153,7 +153,7 @@ export function createUiProxy() {
           pending.length = 0;
         });
         upstream.on('message', (data) => {
-          if (client.readyState === WebSocket.OPEN) client.send(data);
+          if (client.readyState === WebSocket.OPEN) client.send(data.toString('utf8'));
         });
         client.on('close', close);
         upstream.on('close', close);

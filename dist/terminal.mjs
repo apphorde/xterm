@@ -122,10 +122,24 @@ export default function () {
     terminal.write('\n\n');
   }
 
-  function onMessage(message) {
+  async function onMessage(message) {
+    let text;
+    if (typeof message === 'string') {
+      text = message;
+    } else if (message instanceof Blob) {
+      text = await message.text();
+    } else if (message instanceof ArrayBuffer) {
+      text = new TextDecoder().decode(message);
+    } else if (ArrayBuffer.isView(message)) {
+      text = new TextDecoder().decode(message);
+    } else {
+      terminal.write('\r\nReceived unsupported server data\r\n');
+      return;
+    }
+
     let event;
     try {
-      event = JSON.parse(message);
+      event = JSON.parse(text);
     } catch {
       terminal.write('\r\nReceived invalid server data\r\n');
       return;
