@@ -170,7 +170,8 @@ export default function () {
 
     switch (event.type) {
       case 'close':
-        onClose();
+        resetSocket();
+        onStatusChange(false);
         break;
 
       case 'stdout':

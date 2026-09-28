@@ -249,7 +249,7 @@ function showTerminalWorkspace(profile, servers, firstServer, restored = []) {
     if (workspace.sessions.length) workspace.sessions.at(-1).tab.click();
   });
 
-  shell.append(toolbar, tabs, panels);
+  shell.append(toolbar, panels);
   app.append(shell);
   const sessions = restored.length ? restored : [{ server: firstServer }];
   for (const session of sessions) workspace.addSession(session.server, session.id);
@@ -293,7 +293,7 @@ function openConnectionDialog(workspace) {
     for (const server of workspace.servers) {
       const row = element('div', undefined, 'flex items-center justify-between gap-3 rounded px-3 py-2 hover:bg-slate-800');
       row.append(element('span', server.nickname || server.endpoint, 'break-all text-xs text-slate-200'));
-      row.append(button('Connect', '', () => {
+      row.append(button('Connect', 'text-xs', () => {
         overlay.remove();
         workspace.addSession(server);
       }, 'plug-2'));
