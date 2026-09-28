@@ -8,6 +8,7 @@ import {
 
 const app = document.querySelector('#app');
 const propertyName = 'servers';
+const connectionStorageKey = 'xterm.connections';
 window.xtermConnections ||= new Map();
 navigator.serviceWorker?.register('/sw.js').catch(() => {});
 
@@ -47,6 +48,20 @@ function readServers(value) {
   try {
     const parsed = typeof value === 'string' ? JSON.parse(value) : value;
     return Array.isArray(parsed) ? parsed.filter((server) => server?.endpoint && server?.key) : [];
+  } catch {
+    return [];
+  }
+}
+
+function readConnections(servers) {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(connectionStorageKey) || '[]');
+    return Array.isArray(saved)
+      ? saved.map((item) => ({
+        id: item.id,
+        server: servers.find((server) => server.endpoint === item.endpoint),
+      })).filter((item) => item.id && item.server)
+      : [];
   } catch {
     return [];
   }
@@ -178,7 +193,7 @@ function renderSignedIn(profile, initialServers) {
   app.append(header, listPanel, addPanel);
 }
 
-function showTerminalWorkspace(profile, servers, firstServer) {
+function showTerminalWorkspace(profile, servers, firstServer, restored = []) {
   app.replaceChildren();
   const shell = element('section', undefined, 'fixed inset-0 flex flex-col bg-black');
   const toolbar = element('div', undefined, 'flex shrink-0 items-center gap-2 border-b border-slate-800 bg-slate-950 px-3 py-2');
@@ -203,8 +218,9 @@ function showTerminalWorkspace(profile, servers, firstServer) {
     requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
   }
 
-  workspace.addSession = (server) => {
-    const id = crypto.randomUUID();
+  workspace.persist = () => sessionStorage.setItem(connectionStorageKey, JSON.stringify(workspace.sessions.map(({ id, server }) => ({ id, endpoint: server.endpoint }))));
+  workspace.addSession = (server, restoredId) => {
+    const id = restoredId || crypto.randomUUID();
     window.xtermConnections.set(id, server);
     const tab = element('button', server.nickname || server.endpoint, 'shrink-0 rounded px-3 py-1 text-xs text-slate-400 hover:bg-slate-800 hover:text-white');
     tab.type = 'button';
@@ -216,7 +232,8 @@ function showTerminalWorkspace(profile, servers, firstServer) {
     panel.append(terminal);
     tabs.append(tab);
     panels.append(panel);
-    workspace.sessions.push({ id, panel, tab });
+    workspace.sessions.push({ id, panel, tab, server });
+    workspace.persist();
     activate(id);
   };
 
@@ -228,12 +245,14 @@ function showTerminalWorkspace(profile, servers, firstServer) {
     session.tab.remove();
     workspace.sessions = workspace.sessions.filter((item) => item.id !== id);
     window.xtermConnections.delete(id);
+    workspace.persist();
     if (workspace.sessions.length) workspace.sessions.at(-1).tab.click();
   });
 
   shell.append(toolbar, tabs, panels);
   app.append(shell);
-  workspace.addSession(firstServer);
+  const sessions = restored.length ? restored : [{ server: firstServer }];
+  for (const session of sessions) workspace.addSession(session.server, session.id);
 }
 
 function editServer(row, server, renderList, servers) {
@@ -294,7 +313,10 @@ async function start() {
   try {
     const profile = await getProfile();
     const stored = await getPropertyNS(propertyName);
-    renderSignedIn(profile, readServers(stored));
+    const servers = readServers(stored);
+    const restored = readConnections(servers);
+    if (restored.length) showTerminalWorkspace(profile, servers, restored[0].server, restored);
+    else renderSignedIn(profile, servers);
   } catch {
     renderSignedOut();
   }

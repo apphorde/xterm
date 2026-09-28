@@ -53,7 +53,7 @@ export default function () {
       credentials: 'include',
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ endpoint: remote, key }),
+      body: JSON.stringify({ connectionId: connectionId.value, endpoint: remote, key }),
     });
 
     if (!res.ok) throw new Error(`Authentication failed (${res.status})`);

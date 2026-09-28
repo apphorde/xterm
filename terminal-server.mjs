@@ -8,6 +8,7 @@ const port = Number(process.env.PORT || 8000);
 const tokenLifetime = 60_000;
 const killTimeout = Number(process.env.KILL_TIMEOUT || 10_000);
 const tokens = new Map();
+const sessions = new Map();
 const rateLimits = new Map();
 const server = createServer(onHttpRequest);
 const sockets = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 });
@@ -64,8 +65,11 @@ function issueToken(response, ip, body) {
     return;
   }
 
+  const sessionId = typeof payload.sessionId === 'string' && payload.sessionId.length <= 128
+    ? payload.sessionId
+    : randomUUID();
   const token = randomBytes(32).toString('hex');
-  tokens.set(token, Date.now() + tokenLifetime);
+  tokens.set(token, { expiresAt: Date.now() + tokenLifetime, sessionId });
   respond(response, 200, JSON.stringify({ token }), { 'Content-Type': 'application/json' });
 }
 
@@ -98,29 +102,30 @@ function onHttpRequest(request, response) {
 function validToken(request, socket) {
   const url = new URL(request.url, 'http://localhost');
   const token = url.searchParams.get('token');
-  const expiresAt = tokens.get(token);
+  const details = tokens.get(token);
   tokens.delete(token);
-  if (!expiresAt || expiresAt <= Date.now()) {
+  if (!details || details.expiresAt <= Date.now()) {
     socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
     socket.destroy();
     return false;
   }
-  return true;
+  return details;
 }
 
 function onUpgrade(request, socket, head) {
   const ip = clientIp(request);
-  if (!allowRequest(ip) || !validToken(request, socket)) {
+  const details = allowRequest(ip) && validToken(request, socket);
+  if (!details) {
     if (!socket.destroyed) socket.destroy();
     return;
   }
 
   sockets.handleUpgrade(request, socket, head, (websocket) => {
-    sockets.emit('connection', websocket, request);
+    sockets.emit('connection', websocket, request, details);
   });
 }
 
-function createShell(websocket) {
+function createShell(session) {
   const shellEnv = { ...process.env };
   delete shellEnv.WS_AUTH_KEY;
   const shell = pty.spawn('login', [], {
@@ -132,31 +137,50 @@ function createShell(websocket) {
   });
 
   shell.onData((data) => {
-    if (websocket.readyState === websocket.OPEN) websocket.send(JSON.stringify({ type: 'stdout', data }));
+    if (session.websocket?.readyState === session.websocket.OPEN) {
+      session.websocket.send(JSON.stringify({ type: 'stdout', data }));
+    } else {
+      session.output.push(data);
+      if (session.output.length > 100) session.output.shift();
+    }
   });
   shell.onExit(() => {
-    if (websocket.readyState === websocket.OPEN) websocket.send(JSON.stringify({ type: 'close' }));
-    cleanup(websocket);
+    if (session.websocket?.readyState === session.websocket.OPEN) session.websocket.send(JSON.stringify({ type: 'close' }));
+    cleanup(session);
   });
   return shell;
 }
 
-function cleanup(websocket) {
-  if (websocket.killTimer) clearTimeout(websocket.killTimer);
-  if (websocket.shell && !websocket.shell.closed) {
-    websocket.shell.kill();
-    websocket.shell.closed = true;
+function cleanup(session) {
+  if (session.killTimer) clearTimeout(session.killTimer);
+  sessions.delete(session.id);
+  if (session.shell && !session.shell.closed) {
+    session.shell.kill();
+    session.shell.closed = true;
   }
 }
 
-function closeConnection(websocket) {
+function disconnect(session, websocket) {
+  if (session.websocket !== websocket) return;
+  session.websocket = null;
   if (websocket.readyState === websocket.OPEN) websocket.close();
-  if (!websocket.killTimer) websocket.killTimer = setTimeout(() => cleanup(websocket), killTimeout);
+  if (!session.killTimer) session.killTimer = setTimeout(() => cleanup(session), killTimeout);
 }
 
-sockets.on('connection', (websocket) => {
-  websocket.sessionId = randomUUID();
-  websocket.shell = createShell(websocket);
+sockets.on('connection', (websocket, request, details) => {
+  let session = sessions.get(details.sessionId);
+  if (session?.killTimer) {
+    clearTimeout(session.killTimer);
+    session.killTimer = null;
+  }
+  if (!session) {
+    session = { id: details.sessionId, output: [], websocket: null, shell: null, killTimer: null };
+    session.shell = createShell(session);
+    sessions.set(session.id, session);
+  }
+  session.websocket = websocket;
+  for (const data of session.output) websocket.send(JSON.stringify({ type: 'stdout', data }));
+  session.output.length = 0;
   websocket.on('error', (error) => console.error('Websocket error:', error.message));
   websocket.on('message', (data) => {
     let event;
@@ -166,29 +190,30 @@ sockets.on('connection', (websocket) => {
       return;
     }
 
-    if (websocket.shell?.closed) {
-      closeConnection(websocket);
+    if (session.shell?.closed) {
+      disconnect(session, websocket);
       return;
     }
 
     if (event.type === 'input' && typeof event.data === 'string') {
-      websocket.shell.write(event.data);
+      session.shell.write(event.data);
     } else if (event.type === 'resize') {
       const cols = Number(event.data?.cols);
       const rows = Number(event.data?.rows);
       if (Number.isInteger(cols) && Number.isInteger(rows) && cols > 0 && rows > 0 && cols <= 500 && rows <= 200) {
-        websocket.shell.resize(cols, rows);
+        session.shell.resize(cols, rows);
       }
     } else if (event.type === 'close') {
-      closeConnection(websocket);
+      cleanup(session);
+      if (websocket.readyState === websocket.OPEN) websocket.close();
     }
   });
-  websocket.on('close', () => closeConnection(websocket));
+  websocket.on('close', () => disconnect(session, websocket));
 });
 
 setInterval(() => {
   const now = Date.now();
-  for (const [token, expiresAt] of tokens) if (expiresAt <= now) tokens.delete(token);
+  for (const [token, details] of tokens) if (details.expiresAt <= now) tokens.delete(token);
   for (const [ip, record] of rateLimits) if (record.lockUntil <= now) rateLimits.delete(ip);
 }, 30_000).unref();
 

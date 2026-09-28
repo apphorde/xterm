@@ -71,7 +71,7 @@ function websocketEndpoint(endpoint) {
 async function authenticate(request, response) {
   try {
     const body = JSON.parse(await requestBody(request));
-    if (typeof body.endpoint !== 'string' || typeof body.key !== 'string') {
+    if (typeof body.endpoint !== 'string' || typeof body.key !== 'string' || typeof body.connectionId !== 'string') {
       json(response, 400, { error: 'Endpoint and key are required' });
       return;
     }
@@ -92,7 +92,7 @@ async function authenticate(request, response) {
     const authEndpoint = websocketEndpoint(endpoint.toString());
     authEndpoint.protocol = authEndpoint.protocol === 'wss:' ? 'https:' : 'http:';
     const authResponse = await fetch(new URL('/auth', authEndpoint), {
-      body: JSON.stringify({ key: body.key }),
+      body: JSON.stringify({ key: body.key, sessionId: body.connectionId }),
       headers: { 'content-type': 'application/json' },
       method: 'POST',
     });
