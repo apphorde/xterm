@@ -1,0 +1,17 @@
+{
+  "name": "xterm",
+  "short_name": "xterm",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "description": "Authenticated browser terminals",
+  "icons": [
+    {
+      "src": "/app-icon.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

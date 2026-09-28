@@ -9,6 +9,7 @@ import {
 const app = document.querySelector('#app');
 const propertyName = 'servers';
 window.xtermConnections ||= new Map();
+navigator.serviceWorker?.register('/sw.js').catch(() => {});
 
 function element(tag, text, className) {
   const node = document.createElement(tag);
@@ -17,7 +18,7 @@ function element(tag, text, className) {
   return node;
 }
 
-function button(text, className, onClick, icon, primary = true) {
+function button(text, className, onClick, icon, primary = true, iconOnly = false) {
   const baseClass = primary
     ? 'rounded bg-emerald-300 px-2 py-1 font-semi text-slate-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50'
     : 'rounded border border-slate-600 bg-slate-800 px-2 py-1 font-semi text-slate-200 transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50';
@@ -27,9 +28,10 @@ function button(text, className, onClick, icon, primary = true) {
     const iconElement = document.createElement('lucide-icon');
     iconElement.setAttribute('icon', icon);
     iconElement.setAttribute('size', '16');
-    iconElement.className = 'sm:hidden';
+    iconElement.className = iconOnly ? '' : 'sm:hidden';
     iconElement.setAttribute('aria-hidden', 'true');
-    node.append(iconElement, element('span', text, 'hidden sm:inline'));
+    if (iconOnly) node.append(iconElement);
+    else node.append(iconElement, element('span', text, 'hidden sm:inline'));
     node.setAttribute('aria-label', text);
     node.title = text;
   } else {
@@ -117,7 +119,10 @@ function renderSignedIn(profile, initialServers) {
     }
     servers.forEach((server, index) => {
       const row = element('tr', undefined, 'border-t border-slate-800');
-      row.append(element('td', server.endpoint, 'break-all px-4 py-3 font-mono text-xs text-slate-200'));
+      const endpointCell = element('td', undefined, 'px-4 py-3');
+      const endpoint = element('span', server.nickname || server.endpoint, 'break-all font-mono text-xs text-slate-200');
+      endpointCell.append(endpoint);
+      row.append(endpointCell);
       const actions = element('td', '', 'whitespace-nowrap px-4 py-3 text-right');
       actions.append(button('Connect', '', () => {
         showTerminalWorkspace(profile, servers, server);
@@ -127,6 +132,7 @@ function renderSignedIn(profile, initialServers) {
         await saveServers(servers);
         renderList();
       }, 'trash', false));
+      actions.append(button('Edit', 'ml-2', () => editServer(row, server, renderList, servers), 'pencil', false));
       row.append(actions);
       list.append(row);
     });
@@ -138,7 +144,11 @@ function renderSignedIn(profile, initialServers) {
 
   const addPanel = element('section', undefined, 'mt-3 rounded-xl border border-slate-700 bg-slate-900/80 p-4 shadow-xl');
   addPanel.append(element('h2', 'Add a server', 'mb-3 font-semibold'));
-  const form = element('form', undefined, 'grid gap-2 sm:grid-cols-[1.2fr_1fr_auto] sm:items-end');
+  const form = element('form', undefined, 'grid gap-2 sm:grid-cols-[1fr_1.5fr_1fr_auto] sm:items-end');
+  const nicknameLabel = element('label', 'Nickname', 'grid gap-1 text-xs text-slate-400');
+  const nickname = element('input', undefined, 'w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-300 focus:ring-1 focus:ring-emerald-300');
+  nickname.type = 'text'; nickname.required = true; nickname.placeholder = 'Office server';
+  nicknameLabel.append(nickname);
   const endpointLabel = element('label', 'Endpoint', 'grid gap-1 text-xs text-slate-400');
   const endpoint = element('input', undefined, 'w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-300 focus:ring-1 focus:ring-emerald-300');
   endpoint.type = 'url'; endpoint.required = true; endpoint.placeholder = 'wss://server.example/ws';
@@ -149,7 +159,7 @@ function renderSignedIn(profile, initialServers) {
   keyLabel.append(key);
   const submit = button('Add server', 'self-end text-slate-950'); submit.type = 'submit';
   const error = element('p', '', 'text-rose-300');
-  form.append(endpointLabel, keyLabel, submit);
+  form.append(nicknameLabel, endpointLabel, keyLabel, submit);
   form.addEventListener('submit', async (event) => {
     event.preventDefault(); error.textContent = '';
     const normalized = validateEndpoint(endpoint.value.trim());
@@ -157,7 +167,7 @@ function renderSignedIn(profile, initialServers) {
     if (servers.some((server) => server.endpoint === normalized)) { error.textContent = 'That endpoint is already saved.'; return; }
     submit.disabled = true;
     try {
-      servers = [...servers, { endpoint: normalized, key: key.value }];
+      servers = [...servers, { nickname: nickname.value.trim() || normalized, endpoint: normalized, key: key.value }];
       await saveServers(servers);
       form.reset(); renderList();
     } catch (cause) {
@@ -171,11 +181,13 @@ function renderSignedIn(profile, initialServers) {
 function showTerminalWorkspace(profile, servers, firstServer) {
   app.replaceChildren();
   const shell = element('section', undefined, 'fixed inset-0 flex flex-col bg-black');
-  const toolbar = element('div', undefined, 'flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-950 px-3 py-2');
+  const toolbar = element('div', undefined, 'flex shrink-0 items-center gap-2 border-b border-slate-800 bg-slate-950 px-3 py-2');
   toolbar.append(element('span', 'xterm', 'font-semibold text-slate-200'));
   const workspace = { profile, servers, sessions: [], tabs: null, panels: null };
-  toolbar.append(button('New connection', '', () => openConnectionDialog(workspace), 'plus', false));
-  const tabs = element('nav', undefined, 'flex shrink-0 gap-1 overflow-x-auto border-b border-slate-800 bg-slate-950 px-2 py-1');
+  const tabs = element('nav', undefined, 'flex min-w-0 flex-1 gap-1 overflow-x-auto');
+  const add = button('New connection', '', () => openConnectionDialog(workspace), 'plus', false, true);
+  add.classList.add('shrink-0');
+  toolbar.append(tabs, add);
   const panels = element('div', undefined, 'min-h-0 flex-1');
   workspace.tabs = tabs;
   workspace.panels = panels;
@@ -188,12 +200,13 @@ function showTerminalWorkspace(profile, servers, firstServer) {
         ? 'shrink-0 rounded bg-slate-700 px-3 py-1 text-xs text-white'
         : 'shrink-0 rounded px-3 py-1 text-xs text-slate-400 hover:bg-slate-800 hover:text-white';
     }
+    requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
   }
 
   workspace.addSession = (server) => {
     const id = crypto.randomUUID();
     window.xtermConnections.set(id, server);
-    const tab = element('button', server.endpoint, 'shrink-0 rounded px-3 py-1 text-xs text-slate-400 hover:bg-slate-800 hover:text-white');
+    const tab = element('button', server.nickname || server.endpoint, 'shrink-0 rounded px-3 py-1 text-xs text-slate-400 hover:bg-slate-800 hover:text-white');
     tab.type = 'button';
     const panel = element('div', undefined, 'hidden h-full min-h-0');
     const terminal = document.createElement('x-terminal');
@@ -223,6 +236,29 @@ function showTerminalWorkspace(profile, servers, firstServer) {
   workspace.addSession(firstServer);
 }
 
+function editServer(row, server, renderList, servers) {
+  const cell = row.firstChild;
+  cell.replaceChildren();
+  const fields = element('div', undefined, 'grid gap-2 sm:grid-cols-2');
+  const nickname = element('input', undefined, 'w-full rounded border border-slate-600 bg-slate-950 px-2 py-1 text-xs text-slate-100');
+  nickname.value = server.nickname || server.endpoint;
+  const endpoint = element('input', undefined, 'w-full rounded border border-slate-600 bg-slate-950 px-2 py-1 font-mono text-xs text-slate-100');
+  endpoint.value = server.endpoint;
+  fields.append(nickname, endpoint);
+  cell.append(fields);
+  const actions = row.lastChild;
+  actions.replaceChildren();
+  actions.append(button('Save', '', async () => {
+    const normalized = validateEndpoint(endpoint.value.trim());
+    if (!normalized || !nickname.value.trim()) return;
+    server.endpoint = normalized;
+    server.nickname = nickname.value.trim();
+    await saveServers(servers);
+    renderList();
+  }));
+  actions.append(button('Cancel', 'ml-2', renderList, undefined, false));
+}
+
 function openConnectionDialog(workspace) {
   const overlay = element('div', undefined, 'fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4');
   overlay.setAttribute('role', 'dialog');
@@ -237,7 +273,7 @@ function openConnectionDialog(workspace) {
   } else {
     for (const server of workspace.servers) {
       const row = element('div', undefined, 'flex items-center justify-between gap-3 rounded px-3 py-2 hover:bg-slate-800');
-      row.append(element('span', server.endpoint, 'break-all font-mono text-xs text-slate-200'));
+      row.append(element('span', server.nickname || server.endpoint, 'break-all text-xs text-slate-200'));
       row.append(button('Connect', '', () => {
         overlay.remove();
         workspace.addSession(server);
