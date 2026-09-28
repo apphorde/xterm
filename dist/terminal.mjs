@@ -14,12 +14,7 @@ function debounce(fn, time) {
 const autofit = new Set();
 window.addEventListener('resize', () => {
   for (const next of autofit) {
-    const ref = next.deref();
-    if (ref) {
-      ref.fit();
-    } else {
-      autofit.delete(next);
-    }
+    next();
   }
 });
 
@@ -47,6 +42,9 @@ export default function () {
   let currentSocket;
   let terminal;
   let fitAddon;
+  let fitVisible;
+  let socketGeneration = 0;
+  let lastSize = { cols: 80, rows: 24 };
 
   setKey(saved.key || '');
 
@@ -79,10 +77,21 @@ export default function () {
     fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
     terminal.onData(onClientWrite);
-    terminal.onResize(({ cols, rows }) => onSend('resize', { cols, rows }));
+    terminal.onResize(({ cols, rows }) => {
+      if (cols > 0 && rows > 0) {
+        lastSize = { cols, rows };
+        onSend('resize', lastSize);
+      }
+    });
 
-    const addOn = new WeakRef(fitAddon);
-    autofit.add(addOn);
+    fitVisible = () => {
+      const area = terminalRef.value?.getBoundingClientRect();
+      if (!area || area.width <= 0 || area.height <= 0) return lastSize;
+      fitAddon.fit();
+      return lastSize;
+    };
+    autofit.add(fitVisible);
+    fitVisible();
   }
 
   function onClientWrite(c) {
@@ -101,7 +110,8 @@ export default function () {
     }
   }
 
-  function onStatusChange(newStatus) {
+  function onStatusChange(newStatus, socket) {
+    if (socket && socket !== currentSocket) return;
     online.value = newStatus;
 
     if (!newStatus && reconnect.value) {
@@ -109,14 +119,15 @@ export default function () {
     }
 
     if (newStatus) {
-      fitAddon.fit();
+      requestAnimationFrame(() => {
+        const size = fitVisible();
+        onSend('resize', size);
+      });
     }
   }
 
-  function onClose() {
-    reconnect.value = false;
-    window.removeEventListener('xterm-close', onClose);
-
+  function resetSocket() {
+    socketGeneration += 1;
     const socket = currentSocket;
     currentSocket = null;
     online.value = false;
@@ -124,11 +135,15 @@ export default function () {
       if (socket.readyState === socket.OPEN) socket.send(JSON.stringify({ type: 'close' }));
       if (socket.readyState !== socket.CLOSED) socket.close();
     }
-
-    terminal.write('\n\n');
   }
 
-  window.addEventListener('xterm-close', onClose);
+  function onClose(remove = true) {
+    reconnect.value = false;
+    autofit.delete(fitVisible);
+    resetSocket();
+    terminal.write('\n\n');
+    if (remove) window.dispatchEvent(new CustomEvent('xterm-closed', { detail: { id: connectionId.value } }));
+  }
 
   async function onMessage(message) {
     let text;
@@ -177,22 +192,30 @@ export default function () {
   }
 
   async function connect() {
+    const generation = ++socketGeneration;
     try {
       if (!remote.value || !key.value) throw new Error('Select a server from the server list first');
       const token = await getToken(remote.value, key.value);
+      if (generation !== socketGeneration) return;
       const url = new URL('/proxy/connect', location.href);
       url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
       url.searchParams.set('token', token);
 
       const socket = new WebSocket(url);
       socket.addEventListener('message', (e) => onMessage(e.data));
-      socket.addEventListener('close', () => onStatusChange(false));
-      socket.addEventListener('open', () => onStatusChange(true));
+      socket.addEventListener('close', () => onStatusChange(false, socket));
+      socket.addEventListener('open', () => onStatusChange(true, socket));
       socket.addEventListener('error', () => terminal.write('\r\nConnection error\r\n'));
 
       currentSocket = socket;
-      setTimeout(() => fitAddon.fit(), 1000);
+      setTimeout(() => {
+        if (socket === currentSocket) {
+          const size = fitVisible();
+          onSend('resize', size);
+        }
+      }, 1000);
     } catch (cause) {
+      if (generation !== socketGeneration) return;
       terminal.write(`\r\n${cause.message}\r\n`);
       onStatusChange(false);
     }
@@ -205,6 +228,7 @@ export default function () {
 
   function onReconnect() {
     reconnect.value = true;
+    resetSocket();
     terminal.clear();
     connect();
   }

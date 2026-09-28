@@ -207,6 +207,17 @@ function showTerminalWorkspace(profile, servers, firstServer) {
     activate(id);
   };
 
+  window.addEventListener('xterm-closed', (event) => {
+    const id = event.detail?.id;
+    const session = workspace.sessions.find((item) => item.id === id);
+    if (!session) return;
+    session.panel.remove();
+    session.tab.remove();
+    workspace.sessions = workspace.sessions.filter((item) => item.id !== id);
+    window.xtermConnections.delete(id);
+    if (workspace.sessions.length) workspace.sessions.at(-1).tab.click();
+  });
+
   shell.append(toolbar, tabs, panels);
   app.append(shell);
   workspace.addSession(firstServer);
