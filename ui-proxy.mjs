@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import WebSocket, { WebSocketServer } from 'ws';
 
-const authOrigin = new URL(process.env.AUTH_PROVIDER || 'https://auth.api.apphor.de');
+const authOrigin = new URL(process.env.OIDC_ISSUER || 'https://auth.api.apphor.de');
 if (authOrigin.pathname === '/api') authOrigin.pathname = '/';
 const tokenLifetime = 60_000;
 const proxyTokens = new Map();
