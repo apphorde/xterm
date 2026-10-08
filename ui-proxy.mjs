@@ -34,10 +34,23 @@ function json(response, status, body) {
 }
 
 function propertyKeys(request) {
-  const forwardedHost = request.headers['x-forwarded-host'];
-  const host = (typeof forwardedHost === 'string' ? forwardedHost.split(',')[0] : request.headers.host || '').trim();
-  const hostname = host.replace(/:\d+$/, '');
-  return [`${host}:servers`, `${hostname}:servers`];
+  const hosts = new Set();
+  const addHost = (value) => {
+    if (!value) return;
+    try {
+      const parsed = new URL(value.includes('://') ? value : `http://${value}`);
+      hosts.add(parsed.host);
+      hosts.add(parsed.hostname);
+    } catch {
+      const host = value.split(',')[0].trim().replace(/:\d+$/, '');
+      if (host) hosts.add(host);
+    }
+  };
+
+  addHost(request.headers.origin);
+  addHost(request.headers['x-forwarded-host']);
+  addHost(request.headers.host);
+  return [...hosts].map((host) => `${host}:servers`);
 }
 
 async function getSavedServers(request) {
