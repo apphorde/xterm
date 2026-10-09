@@ -144,7 +144,8 @@ async function authenticate(request, response) {
       return;
     }
 
-    const authEndpoint = websocketEndpoint(endpoint.toString());
+    const remoteEndpoint = websocketEndpoint(endpoint.toString());
+    const authEndpoint = new URL(remoteEndpoint);
     authEndpoint.protocol =
       authEndpoint.protocol === "wss:" ? "https:" : "http:";
     const authResponse = await fetch(new URL("/auth", authEndpoint), {
@@ -169,7 +170,7 @@ async function authenticate(request, response) {
     }
     const token = randomBytes(32).toString("base64url");
     proxyTokens.set(token, {
-      endpoint: authEndpoint,
+      endpoint: remoteEndpoint,
       remoteToken: remote.token,
       expiresAt: Date.now() + tokenLifetime,
     });
@@ -216,7 +217,17 @@ export function createUiProxy() {
       bridge.handleUpgrade(request, socket, head, (client) => {
         const target = new URL(details.endpoint);
         target.searchParams.set("token", details.remoteToken);
-        const upstream = new WebSocket(target, { maxPayload: 1024 * 1024 });
+        let upstream;
+        try {
+          upstream = new WebSocket(target, { maxPayload: 1024 * 1024 });
+        } catch (error) {
+          debug("proxy upstream websocket creation failed", {
+            endpoint: details.endpoint.hostname,
+            error: error.message,
+          });
+          client.close();
+          return;
+        }
         const pending = [];
         debug("proxy websocket bridge opened", {
           endpoint: details.endpoint.hostname,
