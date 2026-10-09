@@ -90,6 +90,11 @@ const server = createServer(async (request, response) => {
 });
 
 server.on("upgrade", (request, socket, head) => {
+  const upgradeUrl = new URL(request.url, "http://localhost");
+  console.info("[static] incoming websocket upgrade", {
+    hasToken: upgradeUrl.searchParams.has("token"),
+    path: upgradeUrl.pathname,
+  });
   debug("websocket upgrade received", { url: request.url });
   if (!proxy.handleUpgrade(request, socket, head)) {
     socket.destroy();

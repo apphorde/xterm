@@ -144,6 +144,12 @@ function validToken(request, socket) {
 
 function onUpgrade(request, socket, head) {
   const ip = clientIp(request);
+  const upgradeUrl = new URL(request.url, "http://localhost");
+  console.info("[terminal] incoming websocket upgrade", {
+    hasToken: upgradeUrl.searchParams.has("token"),
+    ip,
+    path: upgradeUrl.pathname,
+  });
   const details = allowRequest(ip) && validToken(request, socket);
   if (!details) {
     debug("websocket upgrade rejected", { ip });
