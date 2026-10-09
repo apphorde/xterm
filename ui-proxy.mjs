@@ -202,6 +202,10 @@ export function createUiProxy() {
 
     handleUpgrade(request, socket, head) {
       const url = new URL(request.url, "http://localhost");
+      debug("websocket upgrade received", {
+        path: url.pathname,
+        token: Boolean(url.searchParams.get("token")),
+      });
       if (url.pathname !== "/proxy/connect") {
         return false;
       }
