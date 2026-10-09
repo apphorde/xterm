@@ -23,6 +23,12 @@ const tokenLifetime = 60_000;
 const proxyTokens = new Map();
 const bridge = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 });
 
+function debug(...args) {
+  if (process.env.DEBUG) {
+    console.debug("[ui-proxy]", ...args);
+  }
+}
+
 function requestBody(request) {
   return new Promise((resolve, reject) => {
     let body = "";
@@ -72,6 +78,7 @@ function propertyKeys(request) {
 async function getSavedServers(request) {
   const profile = await auth.getProfile(request);
   if (!profile) {
+    debug("session rejected");
     return null;
   }
   const keys = propertyKeys(request);
@@ -132,6 +139,7 @@ async function authenticate(request, response) {
         server.endpoint === endpoint.toString() && server.key === body.key,
     );
     if (!saved) {
+      debug("server authorization failed", { endpoint: endpoint.hostname });
       json(response, 403, { error: "Server is not saved for this account" });
       return;
     }
@@ -145,6 +153,10 @@ async function authenticate(request, response) {
       method: "POST",
     });
     if (!authResponse.ok) {
+      debug("remote terminal authentication failed", {
+        endpoint: endpoint.hostname,
+        status: authResponse.status,
+      });
       json(response, authResponse.status, {
         error: "Terminal authentication failed",
       });
@@ -161,8 +173,13 @@ async function authenticate(request, response) {
       remoteToken: remote.token,
       expiresAt: Date.now() + tokenLifetime,
     });
+    debug("proxy token issued", {
+      connectionId: body.connectionId,
+      endpoint: endpoint.hostname,
+    });
     json(response, 200, { token });
   } catch (error) {
+    debug("proxy authentication error", { error: error.message });
     json(response, 400, { error: error.message || "Invalid proxy request" });
   }
 }
@@ -191,6 +208,7 @@ export function createUiProxy() {
       const details = proxyTokens.get(token);
       proxyTokens.delete(token);
       if (!details || details.expiresAt <= Date.now()) {
+        debug("proxy websocket token rejected");
         socket.destroy();
         return true;
       }
@@ -200,7 +218,13 @@ export function createUiProxy() {
         target.searchParams.set("token", details.remoteToken);
         const upstream = new WebSocket(target, { maxPayload: 1024 * 1024 });
         const pending = [];
+        debug("proxy websocket bridge opened", {
+          endpoint: details.endpoint.hostname,
+        });
         const close = () => {
+          debug("proxy websocket bridge closed", {
+            endpoint: details.endpoint.hostname,
+          });
           if (
             client.readyState === WebSocket.OPEN ||
             client.readyState === WebSocket.CONNECTING
@@ -235,7 +259,13 @@ export function createUiProxy() {
         client.on("close", close);
         upstream.on("close", close);
         client.on("error", close);
-        upstream.on("error", close);
+        upstream.on("error", (error) => {
+          debug("proxy upstream websocket error", {
+            endpoint: details.endpoint.hostname,
+            error: error.message,
+          });
+          close();
+        });
       });
       return true;
     },

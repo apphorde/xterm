@@ -1,6 +1,6 @@
-import { ref, hook, templateRef, onInit, defineProp } from '@li3/web';
-import { Terminal } from 'https://unpkg.com/@xterm/xterm@6/lib/xterm.mjs';
-import { FitAddon } from 'https://unpkg.com/@xterm/addon-fit@0.11.0/lib/addon-fit.mjs';
+import { ref, hook, templateRef, onInit, defineProp } from "@li3/web";
+import { Terminal } from "https://unpkg.com/@xterm/xterm@6/lib/xterm.mjs";
+import { FitAddon } from "https://unpkg.com/@xterm/addon-fit@0.11.0/lib/addon-fit.mjs";
 
 function debounce(fn, time) {
   let timer;
@@ -12,7 +12,7 @@ function debounce(fn, time) {
 }
 
 const autofit = new Set();
-window.addEventListener('resize', () => {
+window.addEventListener("resize", () => {
   for (const next of autofit) {
     next();
   }
@@ -20,21 +20,25 @@ window.addEventListener('resize', () => {
 
 export default function () {
   const href = new URL(location.href);
-  const connectionId = defineProp('connectionId', { attribute: true });
+  const connectionId = defineProp("connectionId", { attribute: true });
   const saved = (() => {
     const connection = window.xtermConnections?.get(connectionId.value);
-    if (connection) return connection;
+    if (connection) {
+      return connection;
+    }
     try {
-      return JSON.parse(sessionStorage.getItem('xterm.connection') || '{}');
+      return JSON.parse(sessionStorage.getItem("xterm.connection") || "{}");
     } catch {
       return {};
     }
   })();
-  const [key, setKey] = hook('');
-  const [remote, setRemote] = hook(saved.endpoint || href.searchParams.get('remote') || '');
+  const [key, setKey] = hook("");
+  const [remote] = hook(
+    saved.endpoint || href.searchParams.get("remote") || "",
+  );
   const reconnect = ref(true);
   const online = ref(false);
-  const terminalRef = templateRef('terminal');
+  const terminalRef = templateRef("terminal");
   const debounceTime = 50;
   const maxBuffer = 5;
   const clientBuffer = [];
@@ -46,25 +50,33 @@ export default function () {
   let socketGeneration = 0;
   let lastSize = { cols: 80, rows: 24 };
 
-  setKey(saved.key || '');
+  setKey(saved.key || "");
 
   async function getToken(remote, key) {
-    const res = await fetch('/proxy/auth', {
-      credentials: 'include',
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ connectionId: connectionId.value, endpoint: remote, key }),
+    const res = await fetch("/proxy/auth", {
+      credentials: "include",
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        connectionId: connectionId.value,
+        endpoint: remote,
+        key,
+      }),
     });
 
-    if (!res.ok) throw new Error(`Authentication failed (${res.status})`);
+    if (!res.ok) {
+      throw new Error(`Authentication failed (${res.status})`);
+    }
     const { token } = await res.json();
-    if (!token) throw new Error('Remote server did not return a token');
+    if (!token) {
+      throw new Error("Remote server did not return a token");
+    }
     return token;
   }
 
   function sendInput() {
-    const data = clientBuffer.join('');
-    onSend('input', data);
+    const data = clientBuffer.join("");
+    onSend("input", data);
     clientBuffer.length = 0;
   }
 
@@ -80,13 +92,15 @@ export default function () {
     terminal.onResize(({ cols, rows }) => {
       if (cols > 0 && rows > 0) {
         lastSize = { cols, rows };
-        onSend('resize', lastSize);
+        onSend("resize", lastSize);
       }
     });
 
     fitVisible = () => {
       const area = terminalRef.value?.getBoundingClientRect();
-      if (!area || area.width <= 0 || area.height <= 0) return lastSize;
+      if (!area || area.width <= 0 || area.height <= 0) {
+        return lastSize;
+      }
       fitAddon.fit();
       return lastSize;
     };
@@ -97,7 +111,7 @@ export default function () {
   function onClientWrite(c) {
     clientBuffer.push(c);
 
-    if (c === '\r' || c === '\t' || clientBuffer.length > maxBuffer) {
+    if (c === "\r" || c === "\t" || clientBuffer.length > maxBuffer) {
       return sendInput();
     }
 
@@ -111,7 +125,9 @@ export default function () {
   }
 
   function onStatusChange(newStatus, socket) {
-    if (socket && socket !== currentSocket) return;
+    if (socket && socket !== currentSocket) {
+      return;
+    }
     online.value = newStatus;
 
     if (!newStatus && reconnect.value) {
@@ -121,7 +137,7 @@ export default function () {
     if (newStatus) {
       requestAnimationFrame(() => {
         const size = fitVisible();
-        onSend('resize', size);
+        onSend("resize", size);
       });
     }
   }
@@ -132,8 +148,12 @@ export default function () {
     currentSocket = null;
     online.value = false;
     if (socket) {
-      if (socket.readyState === socket.OPEN) socket.send(JSON.stringify({ type: 'close' }));
-      if (socket.readyState !== socket.CLOSED) socket.close();
+      if (socket.readyState === socket.OPEN) {
+        socket.send(JSON.stringify({ type: "close" }));
+      }
+      if (socket.readyState !== socket.CLOSED) {
+        socket.close();
+      }
     }
   }
 
@@ -141,13 +161,17 @@ export default function () {
     reconnect.value = false;
     autofit.delete(fitVisible);
     resetSocket();
-    terminal.write('\n\n');
-    if (remove) window.dispatchEvent(new CustomEvent('xterm-closed', { detail: { id: connectionId.value } }));
+    terminal.write("\n\n");
+    if (remove) {
+      window.dispatchEvent(
+        new CustomEvent("xterm-closed", { detail: { id: connectionId.value } }),
+      );
+    }
   }
 
   async function onMessage(message) {
     let text;
-    if (typeof message === 'string') {
+    if (typeof message === "string") {
       text = message;
     } else if (message instanceof Blob) {
       text = await message.text();
@@ -156,7 +180,7 @@ export default function () {
     } else if (ArrayBuffer.isView(message)) {
       text = new TextDecoder().decode(message);
     } else {
-      terminal.write('\r\nReceived unsupported server data\r\n');
+      terminal.write("\r\nReceived unsupported server data\r\n");
       return;
     }
 
@@ -164,59 +188,67 @@ export default function () {
     try {
       event = JSON.parse(text);
     } catch {
-      terminal.write('\r\nReceived invalid server data\r\n');
+      terminal.write("\r\nReceived invalid server data\r\n");
       return;
     }
 
     switch (event.type) {
-      case 'close':
+      case "close":
         resetSocket();
         onStatusChange(false);
         break;
 
-      case 'stdout':
+      case "stdout": {
         const chunk = event.data;
 
-        if (typeof chunk === 'string') {
+        if (typeof chunk === "string") {
           terminal.write(chunk);
           break;
         }
 
-        if (chunk.type === 'Buffer') {
+        if (chunk.type === "Buffer") {
           const buffer = new ArrayBuffer(chunk.data.length);
           const uint8 = new Uint8Array(buffer);
           uint8.set(chunk.data, 0);
           terminal.write(uint8);
         }
         break;
+      }
     }
   }
 
   async function connect() {
     const generation = ++socketGeneration;
     try {
-      if (!remote.value || !key.value) throw new Error('Select a server from the server list first');
+      if (!remote.value || !key.value) {
+        throw new Error("Select a server from the server list first");
+      }
       const token = await getToken(remote.value, key.value);
-      if (generation !== socketGeneration) return;
-      const url = new URL('/proxy/connect', location.href);
-      url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-      url.searchParams.set('token', token);
+      if (generation !== socketGeneration) {
+        return;
+      }
+      const url = new URL("/proxy/connect", location.href);
+      url.searchParams.set("token", token);
 
       const socket = new WebSocket(url);
-      socket.addEventListener('message', (e) => onMessage(e.data));
-      socket.addEventListener('close', () => onStatusChange(false, socket));
-      socket.addEventListener('open', () => onStatusChange(true, socket));
-      socket.addEventListener('error', () => terminal.write('\r\nConnection error\r\n'));
+      socket.addEventListener("message", (e) => onMessage(e.data));
+      socket.addEventListener("close", () => onStatusChange(false, socket));
+      socket.addEventListener("open", () => onStatusChange(true, socket));
+      socket.addEventListener("error", () =>
+        terminal.write("\r\nConnection error\r\n"),
+      );
 
       currentSocket = socket;
       setTimeout(() => {
         if (socket === currentSocket) {
           const size = fitVisible();
-          onSend('resize', size);
+          onSend("resize", size);
         }
       }, 1000);
     } catch (cause) {
-      if (generation !== socketGeneration) return;
+      if (generation !== socketGeneration) {
+        return;
+      }
       terminal.write(`\r\n${cause.message}\r\n`);
       onStatusChange(false);
     }
